@@ -1,4 +1,4 @@
-// Arquivo: api/chat.js (VERSÃO FINAL COM ENDPOINT DE WORKFLOW CORRETO)
+// Arquivo: api/chat.js (VERSÃO FINAL COM STREAMING PARA O MAPA)
 
 export const config = {
   runtime: 'edge',
@@ -15,15 +15,14 @@ export default async function handler(request) {
   if (type === 'generate_map') {
     const { inputs } = body;
     const DIFY_API_KEY = process.env.DIFY_GENERATOR_KEY;
-    
-    // =======================================================
-    // MUDANÇA 1: USANDO O ENDPOINT CORRETO PARA WORKFLOWS
-    // =======================================================
     const difyEndpoint = 'https://api.dify.ai/v1/workflows/run';
 
+    // =======================================================
+    // A MUDANÇA ESTÁ AQUI: Pedimos em modo 'streaming'
+    // =======================================================
     const difyPayload = {
       inputs,
-      response_mode: 'blocking', // A resposta virá completa
+      response_mode: 'streaming', // MUDADO DE 'blocking' PARA 'streaming'
       user: 'user-workflow-runner'
     };
 
@@ -33,24 +32,20 @@ export default async function handler(request) {
         headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(difyPayload)
       });
-      
-      const data = await difyResponse.json();
 
-      // Log para vermos a resposta exata do Dify
-      console.log('WORKFLOW RESPONSE:', JSON.stringify(data, null, 2));
-
-      return new Response(JSON.stringify(data), {
+      // Agora, em vez de esperar a resposta completa, apenas repassamos o stream
+      return new Response(difyResponse.body, {
         status: 200,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: { 'Content-Type': 'text/event-stream', 'Access-Control-Allow-Origin': '*' }
       });
 
     } catch (error) {
       console.error('BACKEND WORKFLOW ERROR:', error);
       return new Response(JSON.stringify({ error: 'Falha ao executar workflow no Dify' }), { status: 500 });
     }
-    
+
   } else if (type === 'chat_message') {
-    // A lógica do chat (App 2) já está correta e não precisa mudar.
+    // A lógica do chat não muda
     const { inputs, query, conversation_id } = body;
     const DIFY_API_KEY = process.env.DIFY_CHAT_KEY;
     try {
@@ -64,6 +59,6 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ error: 'Falha ao conversar com Dify' }), { status: 500 });
     }
   }
-  
+
   return new Response(JSON.stringify({ error: 'Tipo de requisição inválida' }), { status: 400 });
 }
