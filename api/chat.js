@@ -1,4 +1,4 @@
-// Arquivo: api/chat.js (VERSÃO FINAL COM CORREÇÃO DE ENDPOINT)
+// Arquivo: api/chat.js (VERSÃO FINAL COM ENDPOINT DE WORKFLOW CORRETO)
 
 export const config = {
   runtime: 'edge',
@@ -15,22 +15,16 @@ export default async function handler(request) {
   if (type === 'generate_map') {
     const { inputs } = body;
     const DIFY_API_KEY = process.env.DIFY_GENERATOR_KEY;
+    
+    // =======================================================
+    // MUDANÇA 1: USANDO O ENDPOINT CORRETO PARA WORKFLOWS
+    // =======================================================
+    const difyEndpoint = 'https://api.dify.ai/v1/workflows/run';
 
-    // =======================================================
-    // MUDANÇA 1: A URL DA API
-    // Trocamos '/completion-messages' por '/chat-messages'
-    // =======================================================
-    const difyEndpoint = 'https://api.dify.ai/v1/chat-messages';
-
-    // =======================================================
-    // MUDANÇA 2: O CONTEÚDO DA MENSAGEM
-    // O endpoint de chat precisa de um 'query', mesmo que seja genérico.
-    // =======================================================
     const difyPayload = {
       inputs,
-      query: 'Gerar o mapa de oportunidades inicial.', // Pergunta genérica para iniciar o workflow
-      response_mode: 'blocking',
-      user: 'user-map-generator-final'
+      response_mode: 'blocking', // A resposta virá completa
+      user: 'user-workflow-runner'
     };
 
     try {
@@ -39,8 +33,11 @@ export default async function handler(request) {
         headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(difyPayload)
       });
-
+      
       const data = await difyResponse.json();
+
+      // Log para vermos a resposta exata do Dify
+      console.log('WORKFLOW RESPONSE:', JSON.stringify(data, null, 2));
 
       return new Response(JSON.stringify(data), {
         status: 200,
@@ -48,12 +45,12 @@ export default async function handler(request) {
       });
 
     } catch (error) {
-      console.error('BACKEND ERROR:', error);
-      return new Response(JSON.stringify({ error: 'Falha ao gerar mapa no Dify' }), { status: 500 });
+      console.error('BACKEND WORKFLOW ERROR:', error);
+      return new Response(JSON.stringify({ error: 'Falha ao executar workflow no Dify' }), { status: 500 });
     }
-
+    
   } else if (type === 'chat_message') {
-    // Esta parte já estava correta e não muda.
+    // A lógica do chat (App 2) já está correta e não precisa mudar.
     const { inputs, query, conversation_id } = body;
     const DIFY_API_KEY = process.env.DIFY_CHAT_KEY;
     try {
@@ -67,6 +64,6 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ error: 'Falha ao conversar com Dify' }), { status: 500 });
     }
   }
-
+  
   return new Response(JSON.stringify({ error: 'Tipo de requisição inválida' }), { status: 400 });
 }
