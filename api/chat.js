@@ -1,4 +1,4 @@
-// Arquivo: api/chat.js (Versão Final para Workflow com Saída JSON)
+// Arquivo: api/chat.js (Versão final para workflow com saída JSON e blocking)
 
 export const config = {
   runtime: 'edge',
@@ -18,7 +18,7 @@ export default async function handler(request) {
     const difyEndpoint = 'https://api.dify.ai/v1/workflows/run';
     const difyPayload = {
       inputs,
-      response_mode: 'blocking',
+      response_mode: 'blocking', // Voltamos ao blocking, pois a Vercel agora espera
       user: 'user-workflow-runner'
     };
     try {
@@ -27,17 +27,16 @@ export default async function handler(request) {
         headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(difyPayload)
       });
-      // Pega a resposta JSON do Dify e repassa diretamente para o frontend
       const data = await difyResponse.json();
       return new Response(JSON.stringify(data), {
-        status: difyResponse.status, // Repassa o status real do Dify
+        status: difyResponse.status,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     } catch (error) {
       return new Response(JSON.stringify({ error: 'Falha ao executar workflow no Dify' }), { status: 500 });
     }
   } else if (type === 'chat_message') {
-    // A lógica de chat para o App 2 permanece a mesma (em streaming)
+    // A lógica de chat continua em streaming, o que é ótimo para conversas
     const { inputs, query, conversation_id } = body;
     const DIFY_API_KEY = process.env.DIFY_CHAT_KEY;
     try {
