@@ -1,4 +1,4 @@
-// Arquivo: api/chat.js (MODO DE DIAGNÓSTICO COMPLETO)
+// Arquivo: api/chat.js (VERSÃO FINAL COM CORREÇÃO DE ENDPOINT)
 
 export const config = {
   runtime: 'edge',
@@ -10,37 +10,37 @@ export default async function handler(request) {
   }
 
   const body = await request.json();
-  // LOG 1: O que o backend recebeu do frontend?
-  console.log('BACKEND LOG 1: Recebido do Frontend ->', JSON.stringify(body, null, 2));
-
   const { type } = body;
 
   if (type === 'generate_map') {
     const { inputs } = body;
     const DIFY_API_KEY = process.env.DIFY_GENERATOR_KEY;
+
+    // =======================================================
+    // MUDANÇA 1: A URL DA API
+    // Trocamos '/completion-messages' por '/chat-messages'
+    // =======================================================
+    const difyEndpoint = 'https://api.dify.ai/v1/chat-messages';
+
+    // =======================================================
+    // MUDANÇA 2: O CONTEÚDO DA MENSAGEM
+    // O endpoint de chat precisa de um 'query', mesmo que seja genérico.
+    // =======================================================
     const difyPayload = {
       inputs,
+      query: 'Gerar o mapa de oportunidades inicial.', // Pergunta genérica para iniciar o workflow
       response_mode: 'blocking',
-      user: 'user-map-generator-debug'
+      user: 'user-map-generator-final'
     };
 
-    // LOG 2: O que o backend está enviando para o Dify?
-    console.log('BACKEND LOG 2: Enviando para Dify ->', JSON.stringify(difyPayload, null, 2));
-
     try {
-      const difyResponse = await fetch('https://api.dify.ai/v1/completion-messages', {
+      const difyResponse = await fetch(difyEndpoint, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(difyPayload)
       });
 
-      const responseBodyText = await difyResponse.text();
-      // LOG 3: Qual foi a resposta EXATA (em texto) que o Dify retornou?
-      console.log('BACKEND LOG 3: Resposta CRUA do Dify ->', responseBodyText);
-
-      const data = JSON.parse(responseBodyText);
-      // LOG 4: Como a resposta ficou depois de ser convertida para JSON?
-      console.log('BACKEND LOG 4: Resposta do Dify como JSON ->', data);
+      const data = await difyResponse.json();
 
       return new Response(JSON.stringify(data), {
         status: 200,
@@ -48,19 +48,19 @@ export default async function handler(request) {
       });
 
     } catch (error) {
-      console.error('BACKEND ERROR: Falha na comunicação com Dify ->', error);
+      console.error('BACKEND ERROR:', error);
       return new Response(JSON.stringify({ error: 'Falha ao gerar mapa no Dify' }), { status: 500 });
     }
 
   } else if (type === 'chat_message') {
-    // A lógica do chat permanece a mesma, pois já estava funcionando.
+    // Esta parte já estava correta e não muda.
     const { inputs, query, conversation_id } = body;
     const DIFY_API_KEY = process.env.DIFY_CHAT_KEY;
     try {
       const difyResponse = await fetch('https://api.dify.ai/v1/chat-messages', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${DIFY_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputs, query, conversation_id, response_mode: 'streaming', user: 'user-chat-assistant-debug' })
+        body: JSON.stringify({ inputs, query, conversation_id, response_mode: 'streaming', user: 'user-chat-assistant' })
       });
       return new Response(difyResponse.body, { status: 200, headers: { 'Content-Type': 'text/event-stream', 'Access-Control-Allow-Origin': '*' }});
     } catch (error) {
